@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://spahaven.example.com/sitemap.xml

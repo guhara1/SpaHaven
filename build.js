@@ -15,7 +15,8 @@ const USE = require('./src/data/use.js');
 const CHECK = require('./src/data/check.js');
 const POLICY = require('./src/data/policy.js');
 
-const OUT = path.join(__dirname, 'docs');
+// 빌드 결과물을 저장소 루트에 생성 — Cloudflare Pages가 루트를 그대로 배포
+const OUT = __dirname;
 const warnings = [];
 
 /* ---------------- helpers ---------------- */
@@ -712,7 +713,7 @@ fs.writeFileSync(path.join(OUT, 'assets/img/hero-placeholder.svg'), `<svg xmlns=
 </svg>`);
 
 /* ---------------- report ---------------- */
-console.log(`generated ${pages.length} pages + root main + 404 + sitemap.xml + robots.txt → docs/`);
+console.log(`generated ${pages.length} pages + root main + 404 + sitemap.xml + robots.txt → 저장소 루트`);
 if (warnings.length) {
   console.log('\n[warnings]');
   warnings.forEach((w) => console.log(' -', w));

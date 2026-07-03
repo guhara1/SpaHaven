@@ -1,7 +1,7 @@
 // 사이트 전역 설정 — 배포 전 SITE_URL과 TELEGRAM_URL을 실제 값으로 변경하세요.
 module.exports = {
-  // 실제 도메인으로 교체 필요 (canonical, og:url, sitemap, schema에 사용)
-  SITE_URL: process.env.SITE_URL || 'https://spahaven.example.com',
+  // 배포 도메인 (canonical, og:url, sitemap, schema에 사용)
+  SITE_URL: process.env.SITE_URL || 'https://spahaven.pages.dev',
   // 텔레그램 아이디로 교체 필요 (푸터 제작문의·제휴문의 버튼)
   TELEGRAM_URL: process.env.TELEGRAM_URL || 'https://t.me/REPLACE_ME',
 
