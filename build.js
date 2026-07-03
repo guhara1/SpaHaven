@@ -312,7 +312,7 @@ function shell(page, bodyHtml) {
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${absUrl(SITE.HERO_IMG)}">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">
+${page.path === 'seoul/' ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Ctext x='50' y='66' font-size='46' font-weight='900' text-anchor='middle' fill='%230a0f1e' font-family='sans-serif'%3EGO%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="${prefix}assets/css/style.css">
@@ -637,7 +637,7 @@ ${ctaBand(prefix)}
 /* ---------------- root redirect / 404 ---------------- */
 fs.writeFileSync(path.join(OUT, 'index.html'), `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
-<title>${esc(SITE.MAIN_TITLE)}</title>
+<title>${esc(SITE.BRAND)} 서울 안내로 이동</title>
 <meta name="robots" content="noindex">
 <link rel="canonical" href="${absUrl('seoul/')}">
 <meta http-equiv="refresh" content="0; url=seoul/">
