@@ -14,8 +14,10 @@ const STATION = require('./src/data/station.js');
 const USE = require('./src/data/use.js');
 const CHECK = require('./src/data/check.js');
 const POLICY = require('./src/data/policy.js');
+const DONG = require('./src/data/dong.js');
 
-const OUT = path.join(__dirname, 'docs');
+// 빌드 결과물을 저장소 루트에 생성 — Cloudflare Pages가 루트를 그대로 배포
+const OUT = __dirname;
 const warnings = [];
 
 /* ---------------- helpers ---------------- */
@@ -38,6 +40,43 @@ function absUrl(p) {
 const guBy = Object.fromEntries(GU.map((g) => [g.slug, g]));
 const areaBy = Object.fromEntries(AREAS.map((a) => [a.slug, a]));
 const lifeBy = Object.fromEntries(LIFE.map((l) => [l.slug, l]));
+
+// 지역명 → 내부 페이지 경로 매핑 (생활권 특징 카드 내부링크용)
+// 우선순위: 생활권 > 역세권 > 구 — 동일 표기가 있으면 생활권 페이지로 연결
+const NAME_TO_PATH = {};
+GU.forEach((g) => { NAME_TO_PATH[g.name] = `seoul/${g.slug}/`; });
+STATION.forEach((s) => { NAME_TO_PATH[s.name] = `seoul/station/${s.slug}/`; });
+LIFE.forEach((l) => { NAME_TO_PATH[l.name] = `seoul/life/${l.slug}/`; });
+// 자주 쓰이는 표기 변형 별칭
+Object.assign(NAME_TO_PATH, {
+  '용산·서울역': 'seoul/life/yongsan-seoul-station/',
+  '서울역·용산': 'seoul/life/yongsan-seoul-station/',
+  '여의도': 'seoul/life/yeouido-yeongdeungpo/',
+  '홍대': 'seoul/life/hongdae-hapjeong/',
+  '잠실': 'seoul/life/jamsil-songpa/',
+  '성수': 'seoul/life/seongsu-wangsimni/',
+  '마곡': 'seoul/life/magok-balsan/',
+  '목동': 'seoul/life/mokdong-yangcheon/',
+  '건대': 'seoul/life/kondae-gwangjin/',
+  '신림': 'seoul/life/sillim-seoul-univ/',
+  '노원': 'seoul/life/nowon-sanggye/',
+  '명동': 'seoul/life/myeongdong-euljiro/',
+  '광화문': 'seoul/life/jongno-gwanghwamun/',
+  '구로디지털단지': 'seoul/station/guro-digital-station/',
+  '가산디지털단지': 'seoul/station/gasan-digital-station/',
+  '천호·강동': 'seoul/gangdong-gu/',
+  '상암·DMC': 'seoul/mapo-gu/',
+  '수유·미아': 'seoul/gangbuk-gu/',
+  '청량리·동대문': 'seoul/dongdaemun-gu/',
+  '상봉·중랑': 'seoul/jungnang-gu/',
+  '신촌·이대': 'seoul/seodaemun-gu/',
+  '성신여대·길음': 'seoul/seongbuk-gu/',
+});
+function hoodLink(name, pagePath) {
+  const target = NAME_TO_PATH[name];
+  if (!target || target === pagePath) return null; // 자기 자신으로는 링크하지 않음
+  return target;
+}
 
 /* ---------------- SVG icons ---------------- */
 const PHONE_SVG = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.6 3h2.9l1.4 4.1-2 1.5a13.4 13.4 0 0 0 6.5 6.5l1.5-2 4.1 1.4v2.9c0 1-.8 1.7-1.7 1.6C10.9 18.4 5.6 13.1 5 4.7 4.9 3.8 5.7 3 6.6 3Z" fill="currentColor"/></svg>';
@@ -233,7 +272,7 @@ function relLinks(links, prefix, title) {
 
 /* ---------------- schema ---------------- */
 function schemaGraph(page) {
-  const url = absUrl(page.path);
+  const url = absUrl(page.canonical || page.path);
   const org = {
     '@type': 'Organization',
     '@id': absUrl('') + '#org',
@@ -294,7 +333,7 @@ function schemaGraph(page) {
 /* ---------------- page shell ---------------- */
 function shell(page, bodyHtml) {
   const prefix = relPrefix(page.path);
-  const url = absUrl(page.path);
+  const url = absUrl(page.canonical || page.path);
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -312,7 +351,7 @@ function shell(page, bodyHtml) {
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${absUrl(SITE.HERO_IMG)}">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">
+${page.hero ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Ctext x='50' y='66' font-size='46' font-weight='900' text-anchor='middle' fill='%230a0f1e' font-family='sans-serif'%3EGO%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="${prefix}assets/css/style.css">
@@ -345,9 +384,16 @@ function regionBody(page, d) {
     : '';
 
   return `
-<div class="page-head">
-  <h1>${esc(d.h1)}</h1>
-  <p class="lead">${esc(d.intro)}</p>
+<div class="hero hero-sub" style="background-image:linear-gradient(105deg, rgba(10,15,30,.94) 32%, rgba(10,15,30,.62) 64%, rgba(249,115,22,.12)), url('${prefix}${SITE.HERO_IMG}')" role="img" aria-label="${esc(SITE.HERO_ALT)}">
+  <div class="hero-in">
+    <span class="eyebrow">간다GO · 서울 전 지역 방문 케어</span>
+    <h1>${esc(d.h1)}</h1>
+    <p class="lead">${esc(d.intro)}</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="${SITE.PHONE_TEL}">전화 예약 ${SITE.PHONE}</a>
+      <a class="btn btn-ghost" href="#pricing">요금 보기</a>
+    </div>
+  </div>
 </div>
 
 ${pricingHtml(prefix, d.name)}
@@ -355,7 +401,13 @@ ${pricingHtml(prefix, d.name)}
 <section>
   <h2>${esc(d.name)}${page.path.startsWith('seoul/station/') ? ' 주변' : ''} 생활권 특징</h2>
   <p>${esc(d.character)}</p>
-  ${d.hoods && d.hoods.length ? `<ul class="hood-list">${d.hoods.map((h) => `<li><span class="hood-n">${esc(h.name)}</span><span class="hood-d">${esc(h.d)}</span></li>`).join('')}</ul>` : ''}
+  ${d.hoods && d.hoods.length ? `<ul class="hood-list">${d.hoods.map((h) => {
+    const target = hoodLink(h.name, page.path);
+    const inner = `<span class="hood-n">${esc(h.name)}</span><span class="hood-d">${esc(h.d)}</span>`;
+    return target
+      ? `<li><a href="${resolve(target, prefix)}">${inner}<span class="hood-more">${esc(h.name)} 안내 보기 →</span></a></li>`
+      : `<li>${inner}</li>`;
+  }).join('')}</ul>` : ''}
 </section>
 
 <section>
@@ -365,6 +417,15 @@ ${pricingHtml(prefix, d.name)}
 </section>
 
 ${guCards}
+
+${DONG[d.slug] ? `<section>
+  <h2>${esc(d.name)} 행정동 안내</h2>
+  <p>${esc(d.name)}의 행정동을 대표동 기준으로 정리했습니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표동 하나로 묶어 안내하며, 관련 생활권 안내가 있는 동은 해당 페이지로 연결됩니다. 아래 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
+  <ul class="chips">${DONG[d.slug].map((o) => o.l
+    ? `<li><a href="${resolve(o.l, prefix)}">${esc(o.n)}</a></li>`
+    : `<li><span class="chip-plain">${esc(o.n)}</span></li>`).join('')}</ul>
+  <p class="muted">번호 행정동 개별 페이지는 만들지 않습니다. 동별 안내가 필요한 경우 대표 생활권 페이지에서 확인하시거나 전화로 문의해 주세요.</p>
+</section>` : ''}
 
 ${noteDefs.length ? `<section>
   <h2>이용 장소별 확인사항</h2>
@@ -500,28 +561,45 @@ const pages = [];
 const crumbSeoul = { name: '서울 출장마사지', path: 'seoul/' };
 
 // main
-pages.push(writePage.call(null, ...(() => {
+const MAIN_FAQS = [
+  SHARED_FAQ[0],
+  { q: '서울은 구별로 찾는 것이 좋나요, 생활권으로 찾는 것이 좋나요?', a: '서울은 같은 구 안에서도 업무지구, 주거지, 숙소 인접권이 다르므로 구와 생활권을 함께 확인하는 것이 좋습니다.' },
+  { q: '호텔이나 숙소에서도 이용할 수 있나요?', a: '숙소 정책, 객실 출입 가능 여부, 프런트 확인 방식, 예약자명, 야간 출입 가능 여부를 먼저 확인해야 합니다.' },
+  { q: '오피스텔 이용 시 어떤 점이 중요한가요?', a: '공동현관, 엘리베이터, 경비실, 주차, 관리 규정, 방문 가능 시간대를 확인해야 합니다.' },
+  SHARED_FAQ[1],
+  SHARED_FAQ[2],
+];
+const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남·잠실·홍대·여의도·성수 생활권별 방문 안내.';
+{
   const page = {
     path: 'seoul/',
+    hero: true,
     title: SITE.MAIN_TITLE,
-    desc: '서울 전 지역 출장마사지·홈타이 간다GO. 강남·잠실·홍대·여의도·성수 생활권별 방문 안내.',
+    desc: MAIN_DESC,
     crumbs: [crumbSeoul],
-    faqs: [
-      SHARED_FAQ[0],
-      { q: '서울은 구별로 찾는 것이 좋나요, 생활권으로 찾는 것이 좋나요?', a: '서울은 같은 구 안에서도 업무지구, 주거지, 숙소 인접권이 다르므로 구와 생활권을 함께 확인하는 것이 좋습니다.' },
-      { q: '호텔이나 숙소에서도 이용할 수 있나요?', a: '숙소 정책, 객실 출입 가능 여부, 프런트 확인 방식, 예약자명, 야간 출입 가능 여부를 먼저 확인해야 합니다.' },
-      { q: '오피스텔 이용 시 어떤 점이 중요한가요?', a: '공동현관, 엘리베이터, 경비실, 주차, 관리 규정, 방문 가능 시간대를 확인해야 합니다.' },
-      SHARED_FAQ[1],
-      SHARED_FAQ[2],
-    ],
+    faqs: MAIN_FAQS,
   };
-  return [page, mainBody(page)];
-})()));
+  pages.push(writePage(page, mainBody(page)));
+}
+// 루트(/)에도 메인 콘텐츠를 그대로 노출 — canonical은 /seoul/ 로 지정해 중복 색인 방지
+{
+  const page = {
+    path: '',
+    canonical: 'seoul/',
+    hero: true,
+    title: SITE.MAIN_TITLE,
+    desc: MAIN_DESC,
+    crumbs: [crumbSeoul],
+    faqs: MAIN_FAQS,
+  };
+  writePage(page, mainBody(page)); // sitemap에는 canonical 대상(/seoul/)만 포함
+}
 
 // areas
 for (const a of AREAS) {
   const page = {
     path: `seoul/area/${a.slug}/`,
+    hero: true,
     title: `${a.h1} | ${SITE.BRAND}`,
     desc: a.desc,
     crumbs: [crumbSeoul, { name: '권역별 안내', path: 'seoul/' }, { name: a.name, path: `seoul/area/${a.slug}/` }],
@@ -535,6 +613,7 @@ for (const g of GU) {
   const area = areaBy[g.area];
   const page = {
     path: `seoul/${g.slug}/`,
+    hero: true,
     title: `${g.h1} | ${SITE.BRAND}`,
     desc: g.desc,
     crumbs: [crumbSeoul, ...(area ? [{ name: area.name, path: `seoul/area/${area.slug}/` }] : []), { name: g.name, path: `seoul/${g.slug}/` }],
@@ -548,6 +627,7 @@ for (const l of LIFE) {
   const g = guBy[l.gu];
   const page = {
     path: `seoul/life/${l.slug}/`,
+    hero: true,
     title: `${l.h1} | ${SITE.BRAND}`,
     desc: l.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: l.name, path: `seoul/life/${l.slug}/` }],
@@ -561,6 +641,7 @@ for (const s of STATION) {
   const g = guBy[s.gu];
   const page = {
     path: `seoul/station/${s.slug}/`,
+    hero: true,
     title: `${s.h1} | ${SITE.BRAND}`,
     desc: s.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: s.name, path: `seoul/station/${s.slug}/` }],
@@ -634,16 +715,7 @@ ${ctaBand(prefix)}
   }, body));
 })();
 
-/* ---------------- root redirect / 404 ---------------- */
-fs.writeFileSync(path.join(OUT, 'index.html'), `<!doctype html>
-<html lang="ko"><head><meta charset="utf-8">
-<title>${esc(SITE.MAIN_TITLE)}</title>
-<meta name="robots" content="noindex">
-<link rel="canonical" href="${absUrl('seoul/')}">
-<meta http-equiv="refresh" content="0; url=seoul/">
-</head><body><p><a href="seoul/">서울 출장마사지 안내로 이동</a></p>
-<script>location.replace('seoul/');</script></body></html>`);
-
+/* ---------------- 404 ---------------- */
 (() => {
   const page = {
     path: '404/', title: `페이지를 찾을 수 없습니다 | ${SITE.BRAND}`,
@@ -705,7 +777,7 @@ fs.writeFileSync(path.join(OUT, 'assets/img/hero-placeholder.svg'), `<svg xmlns=
 </svg>`);
 
 /* ---------------- report ---------------- */
-console.log(`generated ${pages.length} pages + root redirect + 404 + sitemap.xml + robots.txt → docs/`);
+console.log(`generated ${pages.length} pages + root main + 404 + sitemap.xml + robots.txt → 저장소 루트`);
 if (warnings.length) {
   console.log('\n[warnings]');
   warnings.forEach((w) => console.log(' -', w));
