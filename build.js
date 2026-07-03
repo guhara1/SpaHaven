@@ -14,6 +14,7 @@ const STATION = require('./src/data/station.js');
 const USE = require('./src/data/use.js');
 const CHECK = require('./src/data/check.js');
 const POLICY = require('./src/data/policy.js');
+const DONG = require('./src/data/dong.js');
 
 // 빌드 결과물을 저장소 루트에 생성 — Cloudflare Pages가 루트를 그대로 배포
 const OUT = __dirname;
@@ -39,6 +40,43 @@ function absUrl(p) {
 const guBy = Object.fromEntries(GU.map((g) => [g.slug, g]));
 const areaBy = Object.fromEntries(AREAS.map((a) => [a.slug, a]));
 const lifeBy = Object.fromEntries(LIFE.map((l) => [l.slug, l]));
+
+// 지역명 → 내부 페이지 경로 매핑 (생활권 특징 카드 내부링크용)
+// 우선순위: 생활권 > 역세권 > 구 — 동일 표기가 있으면 생활권 페이지로 연결
+const NAME_TO_PATH = {};
+GU.forEach((g) => { NAME_TO_PATH[g.name] = `seoul/${g.slug}/`; });
+STATION.forEach((s) => { NAME_TO_PATH[s.name] = `seoul/station/${s.slug}/`; });
+LIFE.forEach((l) => { NAME_TO_PATH[l.name] = `seoul/life/${l.slug}/`; });
+// 자주 쓰이는 표기 변형 별칭
+Object.assign(NAME_TO_PATH, {
+  '용산·서울역': 'seoul/life/yongsan-seoul-station/',
+  '서울역·용산': 'seoul/life/yongsan-seoul-station/',
+  '여의도': 'seoul/life/yeouido-yeongdeungpo/',
+  '홍대': 'seoul/life/hongdae-hapjeong/',
+  '잠실': 'seoul/life/jamsil-songpa/',
+  '성수': 'seoul/life/seongsu-wangsimni/',
+  '마곡': 'seoul/life/magok-balsan/',
+  '목동': 'seoul/life/mokdong-yangcheon/',
+  '건대': 'seoul/life/kondae-gwangjin/',
+  '신림': 'seoul/life/sillim-seoul-univ/',
+  '노원': 'seoul/life/nowon-sanggye/',
+  '명동': 'seoul/life/myeongdong-euljiro/',
+  '광화문': 'seoul/life/jongno-gwanghwamun/',
+  '구로디지털단지': 'seoul/station/guro-digital-station/',
+  '가산디지털단지': 'seoul/station/gasan-digital-station/',
+  '천호·강동': 'seoul/gangdong-gu/',
+  '상암·DMC': 'seoul/mapo-gu/',
+  '수유·미아': 'seoul/gangbuk-gu/',
+  '청량리·동대문': 'seoul/dongdaemun-gu/',
+  '상봉·중랑': 'seoul/jungnang-gu/',
+  '신촌·이대': 'seoul/seodaemun-gu/',
+  '성신여대·길음': 'seoul/seongbuk-gu/',
+});
+function hoodLink(name, pagePath) {
+  const target = NAME_TO_PATH[name];
+  if (!target || target === pagePath) return null; // 자기 자신으로는 링크하지 않음
+  return target;
+}
 
 /* ---------------- SVG icons ---------------- */
 const PHONE_SVG = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.6 3h2.9l1.4 4.1-2 1.5a13.4 13.4 0 0 0 6.5 6.5l1.5-2 4.1 1.4v2.9c0 1-.8 1.7-1.7 1.6C10.9 18.4 5.6 13.1 5 4.7 4.9 3.8 5.7 3 6.6 3Z" fill="currentColor"/></svg>';
@@ -363,7 +401,13 @@ ${pricingHtml(prefix, d.name)}
 <section>
   <h2>${esc(d.name)}${page.path.startsWith('seoul/station/') ? ' 주변' : ''} 생활권 특징</h2>
   <p>${esc(d.character)}</p>
-  ${d.hoods && d.hoods.length ? `<ul class="hood-list">${d.hoods.map((h) => `<li><span class="hood-n">${esc(h.name)}</span><span class="hood-d">${esc(h.d)}</span></li>`).join('')}</ul>` : ''}
+  ${d.hoods && d.hoods.length ? `<ul class="hood-list">${d.hoods.map((h) => {
+    const target = hoodLink(h.name, page.path);
+    const inner = `<span class="hood-n">${esc(h.name)}</span><span class="hood-d">${esc(h.d)}</span>`;
+    return target
+      ? `<li><a href="${resolve(target, prefix)}">${inner}<span class="hood-more">${esc(h.name)} 안내 보기 →</span></a></li>`
+      : `<li>${inner}</li>`;
+  }).join('')}</ul>` : ''}
 </section>
 
 <section>
@@ -373,6 +417,15 @@ ${pricingHtml(prefix, d.name)}
 </section>
 
 ${guCards}
+
+${DONG[d.slug] ? `<section>
+  <h2>${esc(d.name)} 행정동 안내</h2>
+  <p>${esc(d.name)}의 행정동을 대표동 기준으로 정리했습니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표동 하나로 묶어 안내하며, 관련 생활권 안내가 있는 동은 해당 페이지로 연결됩니다. 아래 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
+  <ul class="chips">${DONG[d.slug].map((o) => o.l
+    ? `<li><a href="${resolve(o.l, prefix)}">${esc(o.n)}</a></li>`
+    : `<li><span class="chip-plain">${esc(o.n)}</span></li>`).join('')}</ul>
+  <p class="muted">번호 행정동 개별 페이지는 만들지 않습니다. 동별 안내가 필요한 경우 대표 생활권 페이지에서 확인하시거나 전화로 문의해 주세요.</p>
+</section>` : ''}
 
 ${noteDefs.length ? `<section>
   <h2>이용 장소별 확인사항</h2>
