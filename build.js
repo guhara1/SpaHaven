@@ -233,7 +233,7 @@ function relLinks(links, prefix, title) {
 
 /* ---------------- schema ---------------- */
 function schemaGraph(page) {
-  const url = absUrl(page.path);
+  const url = absUrl(page.canonical || page.path);
   const org = {
     '@type': 'Organization',
     '@id': absUrl('') + '#org',
@@ -294,7 +294,7 @@ function schemaGraph(page) {
 /* ---------------- page shell ---------------- */
 function shell(page, bodyHtml) {
   const prefix = relPrefix(page.path);
-  const url = absUrl(page.path);
+  const url = absUrl(page.canonical || page.path);
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -312,7 +312,7 @@ function shell(page, bodyHtml) {
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${absUrl(SITE.HERO_IMG)}">
 <meta name="twitter:card" content="summary_large_image">
-${page.path === 'seoul/' ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
+${page.isMain ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Ctext x='50' y='66' font-size='46' font-weight='900' text-anchor='middle' fill='%230a0f1e' font-family='sans-serif'%3EGO%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="${prefix}assets/css/style.css">
@@ -500,23 +500,39 @@ const pages = [];
 const crumbSeoul = { name: '서울 출장마사지', path: 'seoul/' };
 
 // main
-pages.push(writePage.call(null, ...(() => {
+const MAIN_FAQS = [
+  SHARED_FAQ[0],
+  { q: '서울은 구별로 찾는 것이 좋나요, 생활권으로 찾는 것이 좋나요?', a: '서울은 같은 구 안에서도 업무지구, 주거지, 숙소 인접권이 다르므로 구와 생활권을 함께 확인하는 것이 좋습니다.' },
+  { q: '호텔이나 숙소에서도 이용할 수 있나요?', a: '숙소 정책, 객실 출입 가능 여부, 프런트 확인 방식, 예약자명, 야간 출입 가능 여부를 먼저 확인해야 합니다.' },
+  { q: '오피스텔 이용 시 어떤 점이 중요한가요?', a: '공동현관, 엘리베이터, 경비실, 주차, 관리 규정, 방문 가능 시간대를 확인해야 합니다.' },
+  SHARED_FAQ[1],
+  SHARED_FAQ[2],
+];
+const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남·잠실·홍대·여의도·성수 생활권별 방문 안내.';
+{
   const page = {
     path: 'seoul/',
+    isMain: true,
     title: SITE.MAIN_TITLE,
-    desc: '서울 전 지역 출장마사지·홈타이 간다GO. 강남·잠실·홍대·여의도·성수 생활권별 방문 안내.',
+    desc: MAIN_DESC,
     crumbs: [crumbSeoul],
-    faqs: [
-      SHARED_FAQ[0],
-      { q: '서울은 구별로 찾는 것이 좋나요, 생활권으로 찾는 것이 좋나요?', a: '서울은 같은 구 안에서도 업무지구, 주거지, 숙소 인접권이 다르므로 구와 생활권을 함께 확인하는 것이 좋습니다.' },
-      { q: '호텔이나 숙소에서도 이용할 수 있나요?', a: '숙소 정책, 객실 출입 가능 여부, 프런트 확인 방식, 예약자명, 야간 출입 가능 여부를 먼저 확인해야 합니다.' },
-      { q: '오피스텔 이용 시 어떤 점이 중요한가요?', a: '공동현관, 엘리베이터, 경비실, 주차, 관리 규정, 방문 가능 시간대를 확인해야 합니다.' },
-      SHARED_FAQ[1],
-      SHARED_FAQ[2],
-    ],
+    faqs: MAIN_FAQS,
   };
-  return [page, mainBody(page)];
-})()));
+  pages.push(writePage(page, mainBody(page)));
+}
+// 루트(/)에도 메인 콘텐츠를 그대로 노출 — canonical은 /seoul/ 로 지정해 중복 색인 방지
+{
+  const page = {
+    path: '',
+    canonical: 'seoul/',
+    isMain: true,
+    title: SITE.MAIN_TITLE,
+    desc: MAIN_DESC,
+    crumbs: [crumbSeoul],
+    faqs: MAIN_FAQS,
+  };
+  writePage(page, mainBody(page)); // sitemap에는 canonical 대상(/seoul/)만 포함
+}
 
 // areas
 for (const a of AREAS) {
@@ -634,16 +650,7 @@ ${ctaBand(prefix)}
   }, body));
 })();
 
-/* ---------------- root redirect / 404 ---------------- */
-fs.writeFileSync(path.join(OUT, 'index.html'), `<!doctype html>
-<html lang="ko"><head><meta charset="utf-8">
-<title>${esc(SITE.BRAND)} 서울 안내로 이동</title>
-<meta name="robots" content="noindex">
-<link rel="canonical" href="${absUrl('seoul/')}">
-<meta http-equiv="refresh" content="0; url=seoul/">
-</head><body><p><a href="seoul/">서울 출장마사지 안내로 이동</a></p>
-<script>location.replace('seoul/');</script></body></html>`);
-
+/* ---------------- 404 ---------------- */
 (() => {
   const page = {
     path: '404/', title: `페이지를 찾을 수 없습니다 | ${SITE.BRAND}`,
@@ -705,7 +712,7 @@ fs.writeFileSync(path.join(OUT, 'assets/img/hero-placeholder.svg'), `<svg xmlns=
 </svg>`);
 
 /* ---------------- report ---------------- */
-console.log(`generated ${pages.length} pages + root redirect + 404 + sitemap.xml + robots.txt → docs/`);
+console.log(`generated ${pages.length} pages + root main + 404 + sitemap.xml + robots.txt → docs/`);
 if (warnings.length) {
   console.log('\n[warnings]');
   warnings.forEach((w) => console.log(' -', w));
