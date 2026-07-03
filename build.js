@@ -15,6 +15,17 @@ const USE = require('./src/data/use.js');
 const CHECK = require('./src/data/check.js');
 const POLICY = require('./src/data/policy.js');
 const DONG = require('./src/data/dong.js');
+// 동별 고유 콘텐츠 (src/data/dongcontent/{gu}.js) — 아직 없는 구는 빈 객체로 안전 처리
+const DONG_CONTENT = {};
+for (const gu of Object.keys(DONG)) {
+  try { DONG_CONTENT[gu] = require(`./src/data/dongcontent/${gu}.js`); }
+  catch (e) { DONG_CONTENT[gu] = {}; }
+}
+// 콘텐츠가 있는 동만 개별 페이지로 생성 → 얇은 페이지 방지
+function dongHref(guSlug, o) {
+  const c = (DONG_CONTENT[guSlug] || {})[o.s];
+  return c ? `seoul/${guSlug}/${o.s}/` : null;
+}
 
 // 빌드 결과물을 저장소 루트에 생성 — Cloudflare Pages가 루트를 그대로 배포
 const OUT = __dirname;
@@ -369,6 +380,79 @@ ${footerHtml(prefix)}
 }
 
 /* ---------------- region page template (gu / life / station / area) ---------------- */
+// 동 페이지 템플릿 (고유 콘텐츠 c + 공통 블록)
+function dongBody(page, g, o, c) {
+  const prefix = relPrefix(page.path);
+  const area = areaBy[g.area];
+  const life = o.life ? lifeBy[o.life] : null;
+  const stations = (o.st || []).map((s) => STATION.find((x) => x.slug === s)).filter(Boolean);
+  const noteDefs = [
+    ['hotel', '호텔·숙소 이용 전 확인', 'seoul/use/hotel/'],
+    ['officetel', '오피스텔 이용 전 확인', 'seoul/use/officetel/'],
+    ['apartment', '아파트·자택 이용 전 확인', 'seoul/use/apartment/'],
+    ['night', '야간 예약 전 확인', 'seoul/use/night/'],
+  ].filter(([k]) => c.notes && c.notes[k]);
+
+  // 관련 링크: 콘텐츠 지정 링크 + 자동(구·생활권·역·같은 구 인접동)
+  const autoLinks = [];
+  autoLinks.push({ href: `seoul/${g.slug}/`, text: `${g.name} 전체 생활권 안내 보기` });
+  if (life) autoLinks.push({ href: `seoul/life/${life.slug}/`, text: `${life.name} 생활권 이용 기준 보기` });
+  if (area) autoLinks.push({ href: `seoul/area/${area.slug}/`, text: `${area.name} 방문 가능 지역 보기` });
+  stations.forEach((s) => autoLinks.push({ href: `seoul/station/${s.slug}/`, text: `${s.name} 주변 이용 기준 보기` }));
+  // 같은 구 인접 동 2개 (콘텐츠 있는 것 우선)
+  const siblings = DONG[g.slug].filter((x) => x.s !== o.s && (DONG_CONTENT[g.slug] || {})[x.s]).slice(0, 2);
+  siblings.forEach((x) => autoLinks.push({ href: `seoul/${g.slug}/${x.s}/`, text: `${x.n} 방문 안내 보기` }));
+  const links = (c.links || []).concat(autoLinks).slice(0, 7);
+
+  return `
+<div class="hero hero-sub" style="background-image:linear-gradient(105deg, rgba(10,15,30,.94) 32%, rgba(10,15,30,.62) 64%, rgba(249,115,22,.12)), url('${prefix}${SITE.HERO_IMG}')" role="img" aria-label="${esc(SITE.HERO_ALT)}">
+  <div class="hero-in">
+    <span class="eyebrow">간다GO · ${esc(g.name)} ${esc(o.n)} 방문 케어</span>
+    <h1>${esc(c.h1)}</h1>
+    <p class="lead">${esc(c.intro)}</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="${SITE.PHONE_TEL}">전화 예약 ${SITE.PHONE}</a>
+      <a class="btn btn-ghost" href="#pricing">요금 보기</a>
+    </div>
+  </div>
+</div>
+
+${pricingHtml(prefix, o.n)}
+
+<section>
+  <h2>${esc(o.n)} 생활권 특징</h2>
+  <p>${esc(c.character)}</p>
+</section>
+
+${(c.sections || []).map((s) => `<section><h2>${esc(s.h2)}</h2><p>${esc(s.body)}</p></section>`).join('')}
+
+${stations.length ? `<section>
+  <h2>${esc(o.n)}에서 가까운 역과 이동 기준</h2>
+  <p>${esc(c.moving || `${o.n}은 인접 역세권을 기준으로 위치를 확인하면 방문 안내가 빠릅니다. 정확한 도로명 주소와 건물 유형을 함께 알려주시면 이동 시간을 반영해 가능한 예약 시간을 안내드립니다.`)}</p>
+  <ul class="rel-links">${stations.map((s) => `<li style="margin:0;list-style:none"><a href="${resolve(`seoul/station/${s.slug}/`, prefix)}">${esc(s.name)} 주변 호텔·오피스텔 이용 기준 보기</a></li>`).join('')}</ul>
+</section>` : ''}
+
+${noteDefs.length ? `<section>
+  <h2>${esc(o.n)} 이용 장소별 확인사항</h2>
+  <div class="note-cards">
+    ${noteDefs.map(([k, t, href]) => `<div class="card"><h3>${t}</h3><p>${esc(c.notes[k])} <a href="${resolve(href, prefix)}">자세히 보기</a></p></div>`).join('')}
+  </div>
+</section>` : ''}
+
+${checklistHtml(o.n, prefix)}
+
+${policyStrip(prefix)}
+
+${faqHtml(page.faqs)}
+
+${whwHtml(prefix)}
+
+${relLinks(links, prefix, `${esc(o.n)} 관련 안내 바로가기`)}
+
+${ctaBand(prefix, o.n)}
+`;
+}
+
 function regionBody(page, d) {
   const prefix = relPrefix(page.path);
   const stationChips = (d.stations || []).map((s) => `<li style="margin:0"><a href="${resolve(`seoul/station/${s.slug}/`, prefix)}">${esc(s.name)} 주변 이용 기준 보기</a></li>`).join('');
@@ -422,14 +506,14 @@ ${DONG[d.slug] ? (() => {
   const areaFallback = d.area ? `seoul/area/${d.area}/` : null;
   return `<section>
   <h2>${esc(d.name)} 행정동 안내</h2>
-  <p>${esc(d.name)}의 행정동을 대표동 기준으로 정리했습니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표동 하나로 묶어 안내하며, 각 동은 관련 생활권·역세권 또는 권역 안내 페이지로 연결됩니다. 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
+  <p>${esc(d.name)}의 법정동별 방문 안내입니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표 법정동 하나로 묶어 안내하며, 각 동 페이지에서 건물 유형·인접 역·예약 전 확인사항을 확인할 수 있습니다. 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
   <ul class="chips">${DONG[d.slug].map((o) => {
-    const target = o.l || areaFallback;
+    const target = dongHref(d.slug, o) || o.l || areaFallback;
     return target
       ? `<li><a href="${resolve(target, prefix)}">${esc(o.n)}</a></li>`
       : `<li><span class="chip-plain">${esc(o.n)}</span></li>`;
   }).join('')}</ul>
-  <p class="muted">번호 행정동 개별 페이지는 만들지 않습니다(중복·저품질 방지). 동별 세부 안내는 연결된 생활권·권역 페이지에서 확인하시거나 전화로 문의해 주세요.</p>
+  <p class="muted">번호 행정동은 대표 법정동으로 통합해 안내합니다. 세부 주소·건물 출입 방식은 예약 시 확인 후 안내드립니다.</p>
 </section>`;
 })() : ''}
 
@@ -626,6 +710,22 @@ for (const g of GU) {
     faqs: [...g.faq, SHARED_FAQ[0], SHARED_FAQ[2]],
   };
   pages.push(writePage(page, regionBody(page, g)));
+
+  // 동 페이지 (콘텐츠가 있는 동만)
+  const area2 = areaBy[g.area];
+  for (const o of DONG[g.slug]) {
+    const c = (DONG_CONTENT[g.slug] || {})[o.s];
+    if (!c) continue;
+    const dpage = {
+      path: `seoul/${g.slug}/${o.s}/`,
+      hero: true,
+      title: `${c.h1} | ${SITE.BRAND}`,
+      desc: c.desc,
+      crumbs: [crumbSeoul, ...(area2 ? [{ name: area2.name, path: `seoul/area/${area2.slug}/` }] : []), { name: g.name, path: `seoul/${g.slug}/` }, { name: o.n, path: `seoul/${g.slug}/${o.s}/` }],
+      faqs: [...(c.faq || []), SHARED_FAQ[2]],
+    };
+    pages.push(writePage(dpage, dongBody(dpage, g, o, c)));
+  }
 }
 
 // life
@@ -704,6 +804,15 @@ for (const p of POLICY) {
 <p class="lead">간다GO 서울 출장마사지 안내 사이트의 전체 페이지 목록입니다. 권역, 자치구, 생활권, 역세권, 이용 장소, 예약 전 확인, 운영 정책 순서로 정리했습니다.</p></div>
 ${group('서울 5대 권역', AREAS.map((a) => ({ href: `seoul/area/${a.slug}/`, text: a.name })))}
 ${group('서울 25개 구', GU.map((g) => ({ href: `seoul/${g.slug}/`, text: g.name })))}
+${(() => {
+    const dongItems = [];
+    for (const g of GU) {
+      for (const o of DONG[g.slug]) {
+        if ((DONG_CONTENT[g.slug] || {})[o.s]) dongItems.push({ href: `seoul/${g.slug}/${o.s}/`, text: `${g.name} ${o.n}` });
+      }
+    }
+    return dongItems.length ? group(`법정동 안내 (${dongItems.length})`, dongItems) : '';
+  })()}
 ${group('핵심 생활권', LIFE.map((l) => ({ href: `seoul/life/${l.slug}/`, text: l.name })))}
 ${group('핵심 역세권', STATION.map((s) => ({ href: `seoul/station/${s.slug}/`, text: s.name })))}
 ${group('이용 장소', USE.map((u) => ({ href: `seoul/use/${u.slug}/`, text: u.name })))}
@@ -748,8 +857,9 @@ Sitemap: ${absUrl('sitemap.xml')}
 `);
 
 const today = new Date().toISOString().slice(0, 10);
-const urlset = pages.filter((p) => !p.noindex).map((p) => {
-  const pri = p.path === 'seoul/' ? '1.0' : p.path.startsWith('seoul/area/') ? '0.9' : p.path.startsWith('seoul/policy/') || p.path === 'seoul/sitemap/' ? '0.4' : '0.7';
+const urlset = pages.filter((p) => !p.noindex && !p.canonical).map((p) => {
+  const isDong = /^seoul\/[a-z-]+-gu\/[a-z0-9-]+\/$/.test(p.path);
+  const pri = p.path === 'seoul/' ? '1.0' : p.path.startsWith('seoul/area/') ? '0.9' : p.path.startsWith('seoul/policy/') || p.path === 'seoul/sitemap/' ? '0.4' : isDong ? '0.6' : '0.7';
   return `  <url><loc>${absUrl(p.path)}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>${pri}</priority></url>`;
 }).join('\n');
 fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
