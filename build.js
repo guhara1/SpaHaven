@@ -418,14 +418,20 @@ ${pricingHtml(prefix, d.name)}
 
 ${guCards}
 
-${DONG[d.slug] ? `<section>
+${DONG[d.slug] ? (() => {
+  const areaFallback = d.area ? `seoul/area/${d.area}/` : null;
+  return `<section>
   <h2>${esc(d.name)} 행정동 안내</h2>
-  <p>${esc(d.name)}의 행정동을 대표동 기준으로 정리했습니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표동 하나로 묶어 안내하며, 관련 생활권 안내가 있는 동은 해당 페이지로 연결됩니다. 아래 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
-  <ul class="chips">${DONG[d.slug].map((o) => o.l
-    ? `<li><a href="${resolve(o.l, prefix)}">${esc(o.n)}</a></li>`
-    : `<li><span class="chip-plain">${esc(o.n)}</span></li>`).join('')}</ul>
-  <p class="muted">번호 행정동 개별 페이지는 만들지 않습니다. 동별 안내가 필요한 경우 대표 생활권 페이지에서 확인하시거나 전화로 문의해 주세요.</p>
-</section>` : ''}
+  <p>${esc(d.name)}의 행정동을 대표동 기준으로 정리했습니다. 역삼1동·역삼2동처럼 번호로 나뉜 행정동은 대표동 하나로 묶어 안내하며, 각 동은 관련 생활권·역세권 또는 권역 안내 페이지로 연결됩니다. 어느 동이든 방문 상담이 가능하니, 예약 시 동 이름과 함께 정확한 주소를 알려주시면 됩니다.</p>
+  <ul class="chips">${DONG[d.slug].map((o) => {
+    const target = o.l || areaFallback;
+    return target
+      ? `<li><a href="${resolve(target, prefix)}">${esc(o.n)}</a></li>`
+      : `<li><span class="chip-plain">${esc(o.n)}</span></li>`;
+  }).join('')}</ul>
+  <p class="muted">번호 행정동 개별 페이지는 만들지 않습니다(중복·저품질 방지). 동별 세부 안내는 연결된 생활권·권역 페이지에서 확인하시거나 전화로 문의해 주세요.</p>
+</section>`;
+})() : ''}
 
 ${noteDefs.length ? `<section>
   <h2>이용 장소별 확인사항</h2>
