@@ -196,6 +196,11 @@ nav.gnb { display: none; }
 }
 .page-head .lead { font-size: var(--fs-md); color: var(--text-2); max-width: 760px; }
 
+/* sub hero (지역 페이지 상단 이미지 배너) */
+.hero-sub .hero-in { padding: clamp(2rem, 5vw, 3.5rem) clamp(1.4rem, 5vw, 3.5rem); max-width: 820px; }
+.hero-sub h1 { font-size: clamp(1.5rem, 3.6vw, 2.1rem); }
+.hero-sub p.lead { font-size: var(--fs-base); max-width: 680px; }
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;

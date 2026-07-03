@@ -12,8 +12,8 @@ module.exports = {
   MAIN_TITLE: '서울 출장마사지｜강남·잠실·홍대·여의도·성수 홈타이 지역 안내',
   TITLE_SUFFIX: ' | 간다GO',
 
-  HERO_IMG: 'assets/img/hero.jpg', // 메인 히어로 — 이 경로에 이미지를 추가하면 자동 노출
-  HERO_ALT: '서울 야경과 한강 도시 전경 배경의 간다GO 방문 케어 안내 이미지',
+  HERO_IMG: 'assets/img/hero.webp', // 메인·지역 페이지 히어로 이미지
+  HERO_ALT: '달빛 바다와 도시 야경이 보이는 프리미엄 스파 룸 — 간다GO 방문 케어 안내 이미지',
 
   PRICING: [
     { name: '60분 코스', price: '90,000', minutes: '60분', note: '기본 컨디션·릴랙스 케어', featured: false },

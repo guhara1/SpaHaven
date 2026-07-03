@@ -313,7 +313,7 @@ function shell(page, bodyHtml) {
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${absUrl(SITE.HERO_IMG)}">
 <meta name="twitter:card" content="summary_large_image">
-${page.isMain ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
+${page.hero ? `<link rel="preload" as="image" href="${prefix}${SITE.HERO_IMG}">\n` : ''}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Ctext x='50' y='66' font-size='46' font-weight='900' text-anchor='middle' fill='%230a0f1e' font-family='sans-serif'%3EGO%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="${prefix}assets/css/style.css">
@@ -346,9 +346,16 @@ function regionBody(page, d) {
     : '';
 
   return `
-<div class="page-head">
-  <h1>${esc(d.h1)}</h1>
-  <p class="lead">${esc(d.intro)}</p>
+<div class="hero hero-sub" style="background-image:linear-gradient(105deg, rgba(10,15,30,.94) 32%, rgba(10,15,30,.62) 64%, rgba(249,115,22,.12)), url('${prefix}${SITE.HERO_IMG}')" role="img" aria-label="${esc(SITE.HERO_ALT)}">
+  <div class="hero-in">
+    <span class="eyebrow">간다GO · 서울 전 지역 방문 케어</span>
+    <h1>${esc(d.h1)}</h1>
+    <p class="lead">${esc(d.intro)}</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="${SITE.PHONE_TEL}">전화 예약 ${SITE.PHONE}</a>
+      <a class="btn btn-ghost" href="#pricing">요금 보기</a>
+    </div>
+  </div>
 </div>
 
 ${pricingHtml(prefix, d.name)}
@@ -513,7 +520,7 @@ const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남
 {
   const page = {
     path: 'seoul/',
-    isMain: true,
+    hero: true,
     title: SITE.MAIN_TITLE,
     desc: MAIN_DESC,
     crumbs: [crumbSeoul],
@@ -526,7 +533,7 @@ const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남
   const page = {
     path: '',
     canonical: 'seoul/',
-    isMain: true,
+    hero: true,
     title: SITE.MAIN_TITLE,
     desc: MAIN_DESC,
     crumbs: [crumbSeoul],
@@ -539,6 +546,7 @@ const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남
 for (const a of AREAS) {
   const page = {
     path: `seoul/area/${a.slug}/`,
+    hero: true,
     title: `${a.h1} | ${SITE.BRAND}`,
     desc: a.desc,
     crumbs: [crumbSeoul, { name: '권역별 안내', path: 'seoul/' }, { name: a.name, path: `seoul/area/${a.slug}/` }],
@@ -552,6 +560,7 @@ for (const g of GU) {
   const area = areaBy[g.area];
   const page = {
     path: `seoul/${g.slug}/`,
+    hero: true,
     title: `${g.h1} | ${SITE.BRAND}`,
     desc: g.desc,
     crumbs: [crumbSeoul, ...(area ? [{ name: area.name, path: `seoul/area/${area.slug}/` }] : []), { name: g.name, path: `seoul/${g.slug}/` }],
@@ -565,6 +574,7 @@ for (const l of LIFE) {
   const g = guBy[l.gu];
   const page = {
     path: `seoul/life/${l.slug}/`,
+    hero: true,
     title: `${l.h1} | ${SITE.BRAND}`,
     desc: l.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: l.name, path: `seoul/life/${l.slug}/` }],
@@ -578,6 +588,7 @@ for (const s of STATION) {
   const g = guBy[s.gu];
   const page = {
     path: `seoul/station/${s.slug}/`,
+    hero: true,
     title: `${s.h1} | ${SITE.BRAND}`,
     desc: s.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: s.name, path: `seoul/station/${s.slug}/` }],
