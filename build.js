@@ -15,6 +15,11 @@ const USE = require('./src/data/use.js');
 const CHECK = require('./src/data/check.js');
 const POLICY = require('./src/data/policy.js');
 const DONG = require('./src/data/dong.js');
+const REVIEWS = require('./src/data/reviews.js');
+const REVIEW_AGG = {
+  count: REVIEWS.length,
+  value: (REVIEWS.reduce((a, r) => a + r.rating, 0) / REVIEWS.length).toFixed(1),
+};
 // 동별 고유 콘텐츠 (src/data/dongcontent/{gu}.js) — 아직 없는 구는 빈 객체로 안전 처리
 const DONG_CONTENT = {};
 for (const gu of Object.keys(DONG)) {
@@ -170,6 +175,7 @@ function footerHtml(prefix) {
         { href: 'seoul/sitemap/', text: '전체 페이지 보기' },
       ])}
       ${col('이용 안내·정책', [
+        { href: 'seoul/reviews/', text: '이용 후기 모음' },
         { href: 'seoul/check/address/', text: '방문 주소 확인 기준' },
         { href: 'seoul/use/hotel/', text: '호텔·숙소 이용 전 확인' },
         { href: 'seoul/policy/service-standard/', text: '운영 기준' },
@@ -239,6 +245,47 @@ function faqHtml(faqs) {
   </section>`;
 }
 
+function stars(n) {
+  return '<span class="stars" aria-label="별점 ' + n + '점">' + '★'.repeat(n) + '<span class="star-off">' + '★'.repeat(5 - n) + '</span></span>';
+}
+// 이용 후기 섹션 (visible). limit로 노출 개수 조절, more=전체 후기 페이지 링크
+function reviewsHtml(prefix, limit, regionName) {
+  const list = limit ? REVIEWS.slice(0, limit) : REVIEWS;
+  const cards = list.map((r) => `
+      <figure class="review-card">
+        <div class="review-top">${stars(r.rating)}<span class="review-date">${esc(r.date)}</span></div>
+        <blockquote>${esc(r.text)}</blockquote>
+        <figcaption><span class="review-author">${esc(r.author)}</span> <span class="review-meta">${esc(r.meta)}</span></figcaption>
+      </figure>`).join('');
+  return `<section class="reviews" id="reviews">
+    <div class="sec-head">
+      <h2>${regionName ? esc(regionName) + ' ' : ''}이용 후기</h2>
+      <span class="rating-summary" aria-label="평균 별점 ${REVIEW_AGG.value}점, 후기 ${REVIEW_AGG.count}건">${stars(Math.round(REVIEW_AGG.value))} <strong>${REVIEW_AGG.value}</strong> / 5 · 후기 ${REVIEW_AGG.count}건</span>
+    </div>
+    <div class="review-grid">${cards}</div>
+    ${limit ? `<p class="muted"><a href="${resolve('seoul/reviews/', prefix)}">이용 후기 전체 보기 →</a></p>` : ''}
+  </section>`;
+}
+
+// 롱테일 주제 내부링크 블록 — 지역·동 페이지 공통(주제형 앵커)
+function longtailHtml(prefix, extra) {
+  const base = [
+    { href: 'seoul/use/hotel/', text: '호텔·숙소 방문 마사지 예약 전 확인사항' },
+    { href: 'seoul/use/officetel/', text: '오피스텔 방문 마사지 공동현관·관리규정 안내' },
+    { href: 'seoul/use/apartment/', text: '아파트·자택 방문 마사지 주소 확인 기준' },
+    { href: 'seoul/use/business-district/', text: '업무지구 퇴근 후 출장마사지 예약 기준' },
+    { href: 'seoul/use/night/', text: '서울 야간 출장마사지 예약 전 확인사항' },
+    { href: 'seoul/check/building-access/', text: '건물 출입 방식·카드키 확인 안내' },
+    { href: 'seoul/check/time/', text: '예약 가능 시간·이동 거리 안내' },
+    { href: 'seoul/check/privacy/', text: '개인정보 처리 기준·최소 수집 안내' },
+  ];
+  const items = (extra || []).concat(base).slice(0, 10);
+  return `<section>
+    <h2>이런 내용도 함께 확인하세요</h2>
+    <ul class="rel-links">${items.map((l) => `<li style="margin:0;list-style:none"><a href="${resolve(l.href, prefix)}">${esc(l.text)}</a></li>`).join('')}</ul>
+  </section>`;
+}
+
 function checklistHtml(name, prefix) {
   const items = [
     '방문 주소를 정확히 확인했나요?',
@@ -292,6 +339,33 @@ function schemaGraph(page) {
     telephone: SITE.PHONE,
     contactPoint: { '@type': 'ContactPoint', telephone: SITE.PHONE, contactType: 'customer service', availableLanguage: 'Korean' },
   };
+  // 후기가 화면에 노출되는 페이지에만 Review/AggregateRating 부착 (Service 노드)
+  let serviceNode = null;
+  if (page.reviews) {
+    serviceNode = {
+      '@type': 'Service',
+      '@id': url + '#service',
+      name: (page.reviewName ? page.reviewName + ' ' : '') + '방문 케어 서비스',
+      serviceType: '방문형 케어',
+      provider: { '@id': absUrl('') + '#org' },
+      areaServed: { '@type': 'City', name: '서울' },
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: REVIEW_AGG.value,
+        reviewCount: String(REVIEW_AGG.count),
+        bestRating: '5',
+        worstRating: '1',
+      },
+      // 화면에 노출되는 후기만 스키마에 포함 (visible content 일치)
+      review: (page.reviewLimit ? REVIEWS.slice(0, page.reviewLimit) : REVIEWS).map((r) => ({
+        '@type': 'Review',
+        author: { '@type': 'Person', name: r.author },
+        datePublished: r.date,
+        reviewRating: { '@type': 'Rating', ratingValue: String(r.rating), bestRating: '5', worstRating: '1' },
+        reviewBody: r.text,
+      })),
+    };
+  }
   const website = {
     '@type': 'WebSite',
     '@id': absUrl('') + '#website',
@@ -317,6 +391,7 @@ function schemaGraph(page) {
     primaryImageOfPage: { '@id': url + '#primaryimage' },
   };
   const graph = [org, website, img, webpage];
+  if (serviceNode) graph.push(serviceNode);
   if (page.crumbs && page.crumbs.length) {
     graph.push({
       '@type': 'BreadcrumbList',
@@ -350,6 +425,7 @@ function shell(page, bodyHtml) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="naver-site-verification" content="633f1600854d5850796b726de5a5ecabfc7cf002">
 <title>${esc(page.title)}</title>
 <meta name="description" content="${esc(page.desc)}">
 <link rel="canonical" href="${url}">
@@ -449,6 +525,10 @@ ${whwHtml(prefix)}
 
 ${relLinks(links, prefix, `${esc(o.n)} 관련 안내 바로가기`)}
 
+${longtailHtml(prefix)}
+
+${reviewsHtml(prefix, 3, o.n)}
+
 ${ctaBand(prefix, o.n)}
 `;
 }
@@ -534,6 +614,10 @@ ${whwHtml(prefix)}
 
 ${relLinks(d.links, prefix, '관련 지역·기준 보기')}
 
+${longtailHtml(prefix)}
+
+${reviewsHtml(prefix, 3, d.name)}
+
 ${ctaBand(prefix, d.name)}
 `;
 }
@@ -560,6 +644,10 @@ ${faqHtml(page.faqs)}
 ${whwHtml(prefix)}
 
 ${relLinks(d.links, prefix)}
+
+${opts.longtail ? longtailHtml(prefix) : ''}
+
+${opts.reviews ? reviewsHtml(prefix, 3, d.name) : ''}
 
 ${ctaBand(prefix)}
 `;
@@ -621,11 +709,31 @@ ${pricingHtml(prefix)}
   <div class="grid cols-3">${useCards}</div>
 </section>
 
+<section>
+  <h2>지역별 상세 안내 바로가기</h2>
+  <ul class="rel-links">${[
+    { href: 'seoul/life/gangnam-yeoksam/', text: '강남역·역삼 호텔 숙소 이용 전 확인' },
+    { href: 'seoul/life/samseong-seolleung/', text: '삼성·선릉 업무지구 오피스텔 예약 기준' },
+    { href: 'seoul/life/jamsil-songpa/', text: '잠실·송파 아파트 공동현관 확인' },
+    { href: 'seoul/life/yeouido-yeongdeungpo/', text: '여의도·영등포 업무지구 숙소 안내' },
+    { href: 'seoul/life/hongdae-hapjeong/', text: '홍대·합정 관광 숙소 이용 기준' },
+    { href: 'seoul/life/seongsu-wangsimni/', text: '성수·왕십리 오피스텔 이용 안내' },
+    { href: 'seoul/life/yongsan-seoul-station/', text: '서울역·용산 호텔 숙소 이용 전 확인' },
+    { href: 'seoul/life/magok-balsan/', text: '마곡·발산 업무지구 방문 주소 확인' },
+    { href: 'seoul/station/gangnam-station/', text: '강남역 호텔·오피스텔 이용 기준 보기' },
+    { href: 'seoul/station/seoul-station/', text: '서울역 KTX 인접 호텔 숙소 안내' },
+    { href: 'seoul/use/business-district/', text: '업무지구 퇴근 후 출장마사지 예약 기준' },
+    { href: 'seoul/use/night/', text: '서울 야간 출장마사지 예약 전 확인사항' },
+  ].map((l) => `<li style="margin:0;list-style:none"><a href="${resolve(l.href, prefix)}">${esc(l.text)}</a></li>`).join('')}</ul>
+</section>
+
 ${checklistHtml('', prefix)}
 
 ${policyStrip(prefix)}
 
 ${faqHtml(page.faqs)}
+
+${reviewsHtml(prefix, 6, '')}
 
 ${whwHtml(prefix)}
 
@@ -664,6 +772,7 @@ const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남
   const page = {
     path: 'seoul/',
     hero: true,
+    reviews: true, reviewLimit: 6, reviewName: '서울 출장마사지',
     title: SITE.MAIN_TITLE,
     desc: MAIN_DESC,
     crumbs: [crumbSeoul],
@@ -677,6 +786,7 @@ const MAIN_DESC = '서울 전 지역 출장마사지·홈타이 간다GO. 강남
     path: '',
     canonical: 'seoul/',
     hero: true,
+    reviews: true, reviewLimit: 6, reviewName: '서울 출장마사지',
     title: SITE.MAIN_TITLE,
     desc: MAIN_DESC,
     crumbs: [crumbSeoul],
@@ -690,6 +800,7 @@ for (const a of AREAS) {
   const page = {
     path: `seoul/area/${a.slug}/`,
     hero: true,
+    reviews: true, reviewLimit: 3, reviewName: a.name,
     title: `${a.h1} | ${SITE.BRAND}`,
     desc: a.desc,
     crumbs: [crumbSeoul, { name: '권역별 안내', path: 'seoul/' }, { name: a.name, path: `seoul/area/${a.slug}/` }],
@@ -704,6 +815,7 @@ for (const g of GU) {
   const page = {
     path: `seoul/${g.slug}/`,
     hero: true,
+    reviews: true, reviewLimit: 3, reviewName: g.name,
     title: `${g.h1} | ${SITE.BRAND}`,
     desc: g.desc,
     crumbs: [crumbSeoul, ...(area ? [{ name: area.name, path: `seoul/area/${area.slug}/` }] : []), { name: g.name, path: `seoul/${g.slug}/` }],
@@ -719,6 +831,7 @@ for (const g of GU) {
     const dpage = {
       path: `seoul/${g.slug}/${o.s}/`,
       hero: true,
+      reviews: true, reviewLimit: 3, reviewName: o.n,
       title: `${c.h1} | ${SITE.BRAND}`,
       desc: c.desc,
       crumbs: [crumbSeoul, ...(area2 ? [{ name: area2.name, path: `seoul/area/${area2.slug}/` }] : []), { name: g.name, path: `seoul/${g.slug}/` }, { name: o.n, path: `seoul/${g.slug}/${o.s}/` }],
@@ -734,6 +847,7 @@ for (const l of LIFE) {
   const page = {
     path: `seoul/life/${l.slug}/`,
     hero: true,
+    reviews: true, reviewLimit: 3, reviewName: l.name,
     title: `${l.h1} | ${SITE.BRAND}`,
     desc: l.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: l.name, path: `seoul/life/${l.slug}/` }],
@@ -748,6 +862,7 @@ for (const s of STATION) {
   const page = {
     path: `seoul/station/${s.slug}/`,
     hero: true,
+    reviews: true, reviewLimit: 3, reviewName: s.name,
     title: `${s.h1} | ${SITE.BRAND}`,
     desc: s.desc,
     crumbs: [crumbSeoul, ...(g ? [{ name: g.name, path: `seoul/${g.slug}/` }] : []), { name: s.name, path: `seoul/station/${s.slug}/` }],
@@ -762,24 +877,26 @@ for (const s of STATION) {
 for (const u of USE) {
   const page = {
     path: `seoul/use/${u.slug}/`,
+    reviews: true, reviewLimit: 3, reviewName: u.name,
     title: `${u.h1} | ${SITE.BRAND}`,
     desc: u.desc,
     crumbs: [crumbSeoul, { name: '이용 장소', path: 'seoul/' }, { name: u.name, path: `seoul/use/${u.slug}/` }],
     faqs: [...u.faq, SHARED_FAQ[2]],
   };
-  pages.push(writePage(page, topicBody(page, u, { pricing: true })));
+  pages.push(writePage(page, topicBody(page, u, { pricing: true, reviews: true, longtail: true })));
 }
 
 // check
 for (const c of CHECK) {
   const page = {
     path: `seoul/check/${c.slug}/`,
+    reviews: true, reviewLimit: 3, reviewName: c.name,
     title: `${c.h1} | ${SITE.BRAND}`,
     desc: c.desc,
     crumbs: [crumbSeoul, { name: '예약 전 확인', path: 'seoul/' }, { name: c.name, path: `seoul/check/${c.slug}/` }],
     faqs: [...c.faq, SHARED_FAQ[2]],
   };
-  pages.push(writePage(page, topicBody(page, c)));
+  pages.push(writePage(page, topicBody(page, c, { reviews: true, longtail: true })));
 }
 
 // policy
@@ -794,6 +911,48 @@ for (const p of POLICY) {
   };
   pages.push(writePage(page, topicBody(page, p)));
 }
+
+// 이용 후기 전용 페이지 (전체 10건 + 스키마)
+(() => {
+  const prefix = relPrefix('seoul/reviews/');
+  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: REVIEWS.filter((r) => r.rating === n).length }));
+  const body = `
+<div class="page-head">
+  <h1>서울 출장마사지 이용 후기 · 간다GO 방문 케어 실이용 후기</h1>
+  <p class="lead">간다GO 방문 케어를 이용하신 분들이 남겨주신 후기입니다. 대학생부터 직장인, 주부, 어르신, 운동선수까지 다양한 연령·상황의 실제 이용 경험을 별점과 함께 정리했습니다. 좋은 점과 아쉬운 점을 있는 그대로 싣습니다.</p>
+</div>
+
+<section>
+  <div class="rating-board">
+    <div class="rating-big"><strong>${REVIEW_AGG.value}</strong><span>/ 5</span>${stars(Math.round(REVIEW_AGG.value))}<span class="rating-count">후기 ${REVIEW_AGG.count}건 기준</span></div>
+    <ul class="rating-bars">${dist.map((d) => `<li><span class="rb-label">${d.n}점</span><span class="rb-track"><span class="rb-fill" style="width:${Math.round(d.c / REVIEW_AGG.count * 100)}%"></span></span><span class="rb-num">${d.c}</span></li>`).join('')}</ul>
+  </div>
+</section>
+
+${reviewsHtml(prefix, 0, '')}
+
+${policyStrip(prefix)}
+
+<section>
+  <h2>후기 안내 기준</h2>
+  <p>이 페이지의 후기는 이용자가 남겨주신 내용을 바탕으로 정리한 것으로, 별점이 낮은 후기도 삭제하지 않고 함께 싣습니다. 후기는 개인의 경험이며 효과나 만족도는 상황에 따라 다를 수 있습니다. 간다GO는 후기를 임의로 만들어내지 않으며, 예약·상담 과정에서 확인된 실제 이용을 기준으로 관리합니다. 후기 관련 문의는 <a href="${resolve('seoul/policy/contact/', prefix)}">문의하기</a>로 연락해 주세요.</p>
+</section>
+
+${longtailHtml(prefix)}
+
+${ctaBand(prefix)}
+`;
+  pages.push(writePage({
+    path: 'seoul/reviews/',
+    hero: false,
+    reviews: true, reviewName: '서울 출장마사지',
+    title: `서울 출장마사지 이용 후기 · 간다GO 방문 케어 후기 모음 | ${SITE.BRAND}`,
+    desc: '간다GO 방문 케어 이용 후기 모음. 대학생·직장인·주부·어르신 실이용 별점 후기.',
+    crumbs: [crumbSeoul, { name: '이용 후기', path: 'seoul/reviews/' }],
+    faqs: [],
+    countText: false,
+  }, body));
+})();
 
 // HTML sitemap page
 (() => {
@@ -849,8 +1008,21 @@ ${ctaBand(prefix)}
   fs.writeFileSync(path.join(OUT, '404.html'), html.replace(/href="\.\.\//g, 'href="/').replace(/src="\.\.\//g, 'src="/').replace(/url\('\.\.\//g, "url('/"));
 })();
 
-/* ---------------- robots.txt / sitemap.xml ---------------- */
-fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *
+/* ---------------- robots.txt / sitemap.xml / feed ---------------- */
+fs.writeFileSync(path.join(OUT, 'robots.txt'), `# 간다GO robots.txt — 구글·네이버 색인 허용
+User-agent: Googlebot
+Allow: /
+
+User-agent: Yeti
+Allow: /
+
+User-agent: Daumoa
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
+User-agent: *
 Allow: /
 
 Sitemap: ${absUrl('sitemap.xml')}
@@ -866,6 +1038,32 @@ fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="U
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urlset}
 </urlset>
+`);
+
+// RSS 2.0 피드 (네이버 서치어드바이저·구글 색인 보조) — 주요 페이지 색인
+const pubDate = new Date().toUTCString();
+const feedItems = pages
+  .filter((p) => !p.noindex && !p.canonical)
+  .filter((p) => p.path === 'seoul/' || p.path === 'seoul/reviews/' || /^seoul\/(area|life|station)\//.test(p.path) || /^seoul\/[a-z-]+-gu\/$/.test(p.path) || /^seoul\/(use|check)\//.test(p.path))
+  .map((p) => `    <item>
+      <title>${esc(p.title)}</title>
+      <link>${absUrl(p.path)}</link>
+      <guid isPermaLink="true">${absUrl(p.path)}</guid>
+      <description>${esc(p.desc)}</description>
+      <pubDate>${pubDate}</pubDate>
+    </item>`).join('\n');
+fs.writeFileSync(path.join(OUT, 'feed.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>${esc(SITE.MAIN_TITLE)}</title>
+    <link>${absUrl('seoul/')}</link>
+    <atom:link href="${absUrl('feed.xml')}" rel="self" type="application/rss+xml"/>
+    <description>서울 25개 구·생활권·역세권별 출장마사지 방문 안내 — 간다GO</description>
+    <language>ko-KR</language>
+    <lastBuildDate>${pubDate}</lastBuildDate>
+${feedItems}
+  </channel>
+</rss>
 `);
 
 /* ---------------- assets ---------------- */

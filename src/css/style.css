@@ -416,6 +416,43 @@ a.card:hover { text-decoration: none; border-color: var(--accent-line); transfor
   display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; justify-content: space-between;
 }
 
+/* ---------- Reviews ---------- */
+.stars { color: var(--accent); letter-spacing: 1px; white-space: nowrap; }
+.stars .star-off { color: var(--line-strong); }
+.rating-summary { font-size: var(--fs-sm); color: var(--text-2); white-space: nowrap; }
+.rating-summary strong { color: var(--accent-2); font-size: var(--fs-base); }
+.review-grid { display: grid; gap: var(--sp-2); grid-template-columns: 1fr; }
+@media (min-width: 680px) { .review-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .review-grid { grid-template-columns: repeat(3, 1fr); } }
+.review-card {
+  margin: 0; background: linear-gradient(160deg, var(--card), var(--bg-2));
+  border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3);
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.review-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.review-date { font-size: var(--fs-xs); color: var(--muted); }
+.review-card blockquote { margin: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.7; }
+.review-card figcaption { font-size: var(--fs-xs); color: var(--muted); margin-top: auto; }
+.review-author { font-weight: 800; color: var(--text); }
+.review-meta { margin-left: 0.35rem; }
+
+.rating-board {
+  display: grid; gap: var(--sp-4); align-items: center;
+  background: linear-gradient(160deg, var(--card-2), var(--bg-2));
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg); padding: var(--sp-4);
+}
+@media (min-width: 640px) { .rating-board { grid-template-columns: auto 1fr; } }
+.rating-big { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.rating-big strong { font-size: 3rem; font-weight: 900; color: var(--accent-2); line-height: 1; }
+.rating-big > span:first-of-type { color: var(--muted); font-size: var(--fs-sm); }
+.rating-count { color: var(--muted); font-size: var(--fs-xs); margin-top: 0.3rem; }
+.rating-bars { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.rating-bars li { display: flex; align-items: center; gap: 0.6rem; font-size: var(--fs-xs); color: var(--muted); }
+.rb-label { width: 2.2rem; }
+.rb-track { flex: 1; height: 8px; background: var(--bg-3); border-radius: var(--r-full); overflow: hidden; }
+.rb-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.rb-num { width: 1.4rem; text-align: right; }
+
 /* ---------- Floating phone button ---------- */
 .float-call {
   position: fixed; right: 1.1rem; bottom: 1.2rem; z-index: 90;
